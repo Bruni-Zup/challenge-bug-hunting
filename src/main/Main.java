@@ -1,66 +1,57 @@
 package main;
 
+import manager.VideoManager;
 import model.Video;
 import repository.FileVideoRepository;
 import service.VideoService;
 import service.VideoServiceImpl;
-import strategy.SearchStrategy;
-import strategy.TitleSearchStrategy;
+import util.FileHandler;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        VideoService videoService = new VideoServiceImpl(new FileVideoRepository("videos.txt"));
-        SearchStrategy searchStrategy = new TitleSearchStrategy();
+        FileHandler fileHandler = new FileHandler("videos.txt");
+        VideoService videoService = new VideoServiceImpl(new FileVideoRepository(fileHandler));
+        VideoManager videoManager = new VideoManager(videoService);
 
-        while (true) {
-            System.out.println("\n=== Sistema de Gerenciamento de Vídeos ===");
-            System.out.println("1. Adicionar vídeo");
-            System.out.println("2. Listar vídeos");
-            System.out.println("3. Pesquisar vídeo por título");
-            System.out.println("4. Sair");
+        boolean running = true;
+        while (running) {
+            System.out.println("\nMenu:");
+            System.out.println("1. Adicionar Vídeo");
+            System.out.println("2. Listar Vídeos");
+            System.out.println("3. Sair");
             System.out.print("Escolha uma opção: ");
-
-            int opcao;
-            try {
-                opcao = Integer.parseInt(scanner.nextLine());
-            } catch (NumberFormatException e) {
-                System.out.println("Entrada inválida. Por favor, digite um número.");
-                continue;
-            }
+            String opcao = scanner.nextLine();
 
             switch (opcao) {
-                case 1:
-                    adicionarVideo(scanner, videoService);
+                case "1":
+                    adicionarVideo(scanner, videoManager);
                     break;
-                case 2:
-                    listarVideos(videoService);
+                case "2":
+                    listarVideos(videoManager);
                     break;
-                case 3:
-                    pesquisarVideo(scanner, videoService, searchStrategy);
-                    break;
-                case 4:
+                case "3":
+                    running = false;
                     System.out.println("Saindo do sistema...");
-                    scanner.close();
-                    return;
+                    break;
                 default:
-                    System.out.println("Opção inválida.");
+                    System.out.println("Opção inválida. Tente novamente.");
             }
         }
+        scanner.close();
     }
 
-    private static void adicionarVideo(Scanner scanner, VideoService videoService) {
+    private static void adicionarVideo(Scanner scanner, VideoManager videoManager) {
         System.out.print("Digite o título do vídeo: ");
         String titulo = scanner.nextLine();
         System.out.print("Digite a descrição do vídeo: ");
         String descricao = scanner.nextLine();
         System.out.print("Digite a duração do vídeo (em minutos): ");
-
         int duracao;
         try {
             duracao = Integer.parseInt(scanner.nextLine());
@@ -68,56 +59,37 @@ public class Main {
             System.out.println("Erro: A duração deve ser um número inteiro.");
             return;
         }
-
         System.out.print("Digite a categoria do vídeo: ");
         String categoria = scanner.nextLine();
         System.out.print("Digite a data de publicação (dd/MM/yyyy): ");
         String dataStr = scanner.nextLine();
 
-        // Validação de campos obrigatórios
         if (titulo.isEmpty() || descricao.isEmpty() || categoria.isEmpty() || dataStr.isEmpty()) {
             System.out.println("Erro: Todos os campos são obrigatórios.");
             return;
         }
 
         try {
-            // Validação e parsing da data
-            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
-            sdf.setLenient(false); // Validação rigorosa
-            Date dataPublicacao = sdf.parse(dataStr);
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            LocalDate dataPublicacao = LocalDate.parse(dataStr, formatter);
 
-            // Criação e adição do vídeo
             Video video = new Video(titulo, descricao, duracao, categoria, dataPublicacao);
-            videoService.addVideo(video);
+            videoManager.addVideo(video);
             System.out.println("Vídeo adicionado com sucesso!");
-        } catch (java.text.ParseException e) {
+        } catch (DateTimeParseException e) {
             System.out.println("Erro: Data de publicação inválida. Use o formato dd/MM/yyyy.");
-        } catch (Exception e) {
-            System.out.println("Erro inesperado ao adicionar vídeo: " + e.getMessage());
         }
     }
 
-    private static void listarVideos(VideoService videoService) {
-        List<Video> videos = videoService.listVideos();
-        if (videos.isEmpty()) {
-            System.out.println("Nenhum vídeo encontrado.");
-        } else {
-            for (Video video : videos) {
-                System.out.println(video);
-            }
-        }
-    }
-
-    private static void pesquisarVideo(Scanner scanner, VideoService videoService, SearchStrategy searchStrategy) {
-        System.out.print("Digite o título para busca: ");
-        String query = scanner.nextLine();
-        List<Video> resultados = searchStrategy.search(videoService.listVideos(), query);
-        if (resultados.isEmpty()) {
-            System.out.println("Nenhum vídeo encontrado com o título especificado.");
-        } else {
-            for (Video video : resultados) {
-                System.out.println(video);
-            }
-        }
+    private static void listarVideos(VideoManager videoManager) {
+        System.out.println("\nLista de Vídeos:");
+        videoManager.listVideos().forEach(video -> {
+            System.out.println("Título: " + video.getTitulo());
+            System.out.println("Descrição: " + video.getDescricao());
+            System.out.println("Duração: " + video.getDuracao() + " minutos");
+            System.out.println("Categoria: " + video.getCategoria());
+            System.out.println("Data de Publicação: " + video.getDataPublicacao());
+            System.out.println("-------------------------");
+        });
     }
 }
